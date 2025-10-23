@@ -248,7 +248,7 @@
         <div class="card">
             <div class="header">
                 <h1>生产数据收集系统</h1>
-                <p>扫码填写 · 云端同步</p>
+                <p>扫码填写 · Google Sheets云端同步</p>
             </div>
             
             <div class="sync-status" id="syncStatus">
@@ -368,6 +368,7 @@
             <div class="tab-content" id="data-tab">
                 <div style="margin-bottom: 15px;">
                     <button class="btn btn-success" onclick="loadData()">刷新数据</button>
+                    <button class="btn" onclick="testConnection()" style="background: #722ed1; color: white;">测试服务器连接</button>
                 </div>
                 
                 <div style="max-height: 500px; overflow-y: auto;">
@@ -390,7 +391,7 @@
                 </div>
                 
                 <div style="margin-top: 15px; text-align: center; color: #666; font-size: 12px;">
-                    共 <span id="data-count">0</span> 条记录
+                    共 <span id="data-count">0</span> 条记录 | 数据来源: <span id="data-source">本地</span>
                 </div>
             </div>
             
@@ -398,7 +399,8 @@
             <div class="tab-content" id="export-tab">
                 <div style="margin-bottom: 20px;">
                     <button class="btn btn-success" onclick="exportToExcel()">导出Excel文件</button>
-                    <button class="btn btn-warning" onclick="clearAllData()" style="background: #f5222d; color: white;">清空所有数据</button>
+                    <button class="btn" onclick="testConnection()" style="background: #722ed1; color: white;">测试服务器连接</button>
+                    <button class="btn btn-warning" onclick="clearAllData()" style="background: #f5222d; color: white;">清空本地数据</button>
                 </div>
                 
                 <div style="background: #f6ffed; padding: 15px; border-radius: 8px; border: 1px solid #b7eb8f;">
@@ -406,7 +408,7 @@
                     <div id="stats-content">
                         <div>总记录数: <span id="total-count">0</span></div>
                         <div>今日记录: <span id="today-count">0</span></div>
-                        <div>数据大小: <span id="data-size">0 KB</span></div>
+                        <div>数据来源: <span id="storage-type">本地存储</span></div>
                     </div>
                 </div>
             </div>
@@ -414,6 +416,103 @@
     </div>
 
     <script>
+        // === Google Apps Script 后端集成 ===
+        const API_CONFIG = {
+            baseURL: 'https://script.google.com/macros/s/AKfycbwAWBBSiZfLH6PNNjIl_rX-8sYKw70GS8WnirasX1eRy0QcHoqPyCOONXrKd9Owj3H--w/exec'
+        };
+
+        // 测试服务器连接
+        async function testConnection() {
+            updateSyncStatus('🔄 正在测试服务器连接...', 'syncing');
+            
+            try {
+                const response = await fetch(API_CONFIG.baseURL + '?action=test');
+                const result = await response.json();
+                
+                updateSyncStatus('✅ 服务器连接正常', 'success');
+                showMessage('服务器连接正常: ' + result.message);
+                return true;
+                
+            } catch (error) {
+                updateSyncStatus('❌ 服务器连接失败', 'error');
+                showMessage('服务器连接失败: ' + error.message, 'error');
+                return false;
+            }
+        }
+
+        // 提交数据到Google Sheets
+        async function submitToServer(data) {
+            updateSyncStatus('🔄 正在提交数据到服务器...', 'syncing');
+            
+            try {
+                const response = await fetch(API_CONFIG.baseURL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    updateSyncStatus('✅ 数据提交成功', 'success');
+                    return { success: true, data: result };
+                } else {
+                    throw new Error(result.error || '提交失败');
+                }
+                
+            } catch (error) {
+                updateSyncStatus('❌ 提交失败，已保存到本地', 'error');
+                saveToLocalStorage(data);
+                return { success: false, error: error.message };
+            }
+        }
+
+        // 从服务器加载数据
+        async function loadDataFromServer() {
+            updateSyncStatus('🔄 正在从服务器加载数据...', 'syncing');
+            
+            try {
+                const response = await fetch(API_CONFIG.baseURL + '?action=query');
+                const result = await response.json();
+                
+                if (result.success) {
+                    updateSyncStatus('✅ 数据加载成功', 'success');
+                    document.getElementById('data-source').textContent = '云端';
+                    document.getElementById('storage-type').textContent = 'Google Sheets';
+                    return result.data;
+                } else {
+                    throw new Error(result.error || '加载失败');
+                }
+                
+            } catch (error) {
+                updateSyncStatus('❌ 服务器连接失败，显示本地数据', 'error');
+                document.getElementById('data-source').textContent = '本地';
+                document.getElementById('storage-type').textContent = '本地存储';
+                return loadFromLocalStorage();
+            }
+        }
+
+        // 保存到本地存储（备用）
+        function saveToLocalStorage(data) {
+            const localData = JSON.parse(localStorage.getItem('productionData_backup') || '[]');
+            data.id = Date.now();
+            data.submit_time = new Date().toISOString();
+            data.spec_display = formatSpec(data.thickness, data.width, data.pitch);
+            data.localBackup = true;
+            localData.push(data);
+            localStorage.setItem('productionData_backup', JSON.stringify(localData));
+            return data;
+        }
+
+        // 从本地存储加载（备用）
+        function loadFromLocalStorage() {
+            const localData = JSON.parse(localStorage.getItem('productionData_backup') || '[]');
+            return localData;
+        }
+
+        // === 原有配置和函数 ===
         // 配置信息
         const CONFIG = {
             lineNumbers: ['1号线', '2号线', '3号线', '4号线', '5号线', '6号线', '7号线', '8号线', '9号线', '10号线'],
@@ -506,25 +605,15 @@
             return `厚${thickness}*宽${width}*步${pitch}`;
         }
 
-        // 保存数据到本地存储
-        function saveData(data) {
-            const allData = getAllData();
-            data.id = Date.now();
-            data.submit_time = new Date().toISOString();
-            data.spec_display = formatSpec(data.thickness, data.width, data.pitch);
-            allData.push(data);
-            localStorage.setItem('productionData', JSON.stringify(allData));
-            return data;
-        }
-
-        // 获取所有数据
+        // 获取所有数据（兼容云端和本地）
         function getAllData() {
-            return JSON.parse(localStorage.getItem('productionData') || '[]');
+            const localData = loadFromLocalStorage();
+            return localData;
         }
 
         // 加载数据到表格
-        function loadData() {
-            const data = getAllData();
+        async function loadData() {
+            const data = await loadDataFromServer();
             displayData(data);
         }
 
@@ -535,17 +624,21 @@
             
             if (data && data.length > 0) {
                 // 按时间倒序排列
-                data.sort((a, b) => b.id - a.id);
+                data.sort((a, b) => {
+                    const timeA = a.id || new Date(a.提交时间 || a.submit_time).getTime();
+                    const timeB = b.id || new Date(b.提交时间 || b.submit_time).getTime();
+                    return timeB - timeA;
+                });
                 
                 tbody.innerHTML = data.map(item => `
                     <tr>
-                        <td>${item.line_number}</td>
-                        <td>${item.customer}</td>
-                        <td>${item.start_time}-${item.end_time}</td>
-                        <td>${item.spec_display}</td>
-                        <td>${item.output_weight || '0'}KG</td>
-                        <td>${item.defect_count || '0'}</td>
-                        <td>${formatTime(item.submit_time)}</td>
+                        <td>${item.线号 || item.line_number}</td>
+                        <td>${item.客户 || item.customer}</td>
+                        <td>${item.开始时间 || item.start_time}-${item.结束时间 || item.end_time}</td>
+                        <td>${item.spec_display || formatSpec(item.厚度 || item.thickness, item.宽度 || item.width, item.步距 || item.pitch)}</td>
+                        <td>${item.良品重量 || item.output_weight || '0'}KG</td>
+                        <td>${item.不良数量 || item.defect_count || '0'}</td>
+                        <td>${formatTime(item.提交时间 || item.submit_time)}</td>
                     </tr>
                 `).join('');
                 countEl.textContent = data.length;
@@ -557,6 +650,7 @@
 
         // 格式化时间显示
         function formatTime(isoString) {
+            if (!isoString) return '';
             const date = new Date(isoString);
             return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
         }
@@ -578,18 +672,18 @@
             // 数据行
             data.forEach(item => {
                 const row = [
-                    item.line_number,
-                    item.customer,
-                    item.start_time,
-                    item.end_time,
-                    item.thickness,
-                    item.width,
-                    item.pitch,
-                    item.input_weight || '0',
-                    item.output_weight || '0',
-                    item.defect_count || '0',
-                    `"${item.notes || ''}"`,
-                    `"${new Date(item.submit_time).toLocaleString('zh-CN')}"`
+                    item.线号 || item.line_number,
+                    item.客户 || item.customer,
+                    item.开始时间 || item.start_time,
+                    item.结束时间 || item.end_time,
+                    item.厚度 || item.thickness,
+                    item.宽度 || item.width,
+                    item.步距 || item.pitch,
+                    item.来料重量 || item.input_weight || '0',
+                    item.良品重量 || item.output_weight || '0',
+                    item.不良数量 || item.defect_count || '0',
+                    `"${item.备注 || item.notes || ''}"`,
+                    `"${new Date(item.提交时间 || item.submit_time).toLocaleString('zh-CN')}"`
                 ];
                 csv += row.join(',') + '\n';
             });
@@ -609,12 +703,12 @@
 
         // 清空所有数据
         function clearAllData() {
-            if (confirm('确定要清空所有数据吗？此操作不可恢复！')) {
-                localStorage.removeItem('productionData');
-                updateSyncStatus('数据已清空', 'success');
+            if (confirm('确定要清空所有本地数据吗？此操作不可恢复！')) {
+                localStorage.removeItem('productionData_backup');
+                updateSyncStatus('本地数据已清空', 'success');
                 loadData();
                 updateStats();
-                showMessage('所有数据已清空');
+                showMessage('所有本地数据已清空');
             }
         }
 
@@ -622,13 +716,13 @@
         function updateStats() {
             const data = getAllData();
             const today = new Date().toDateString();
-            const todayCount = data.filter(item => new Date(item.submit_time).toDateString() === today).length;
+            const todayCount = data.filter(item => {
+                const itemDate = new Date(item.提交时间 || item.submit_time).toDateString();
+                return itemDate === today;
+            }).length;
             
             document.getElementById('total-count').textContent = data.length;
             document.getElementById('today-count').textContent = todayCount;
-            
-            const dataSize = JSON.stringify(data).length;
-            document.getElementById('data-size').textContent = (dataSize / 1024).toFixed(2) + ' KB';
         }
 
         // 设置当前时间
@@ -638,13 +732,12 @@
             const minutes = now.getMinutes().toString().padStart(2, '0');
             const currentTime = `${hours}.${minutes}`;
             
-            // 设置开始时间和结束时间为当前时间
             document.getElementById('start_time').value = currentTime;
             document.getElementById('end_time').value = currentTime;
         }
 
         // 表单提交
-        document.getElementById('productionForm').addEventListener('submit', function(e) {
+        document.getElementById('productionForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const formData = new FormData(this);
@@ -664,9 +757,17 @@
             updateSyncStatus('🔄 正在保存数据...', 'syncing');
             
             try {
-                const savedData = saveData(data);
-                updateSyncStatus('✅ 数据保存成功', 'success');
-                showMessage('数据提交成功！');
+                // 先尝试提交到服务器
+                const serverResult = await submitToServer(data);
+                
+                if (serverResult.success) {
+                    updateSyncStatus('✅ 数据保存成功', 'success');
+                    showMessage('数据提交成功！');
+                } else {
+                    // 服务器失败，保存到本地
+                    const savedData = saveToLocalStorage(data);
+                    showMessage('数据已保存到本地（服务器连接失败）', 'warning');
+                }
                 
                 // 重置表单（保留线号和客户选择）
                 const lineNumber = data.line_number;
@@ -692,6 +793,11 @@
             initializeSelectOptions();
             loadData();
             updateStats();
+            
+            // 自动测试连接
+            setTimeout(() => {
+                testConnection();
+            }, 1000);
         });
     </script>
 </body>
