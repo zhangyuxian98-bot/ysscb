@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>生产数据收集系统 - Production Data Collection</title>
+    <style>
+        :root {
+            --primary: #1890ff;
+            --success: #52c41a;
+            --warning: #faad14;
+            --error: #f5222d;
+            --text: #333;
+            --text-light: #666;
+            --border: #e8e8e8;
+            --background: #f5f5f5;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--background);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 100%;
+            padding: 15px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .header h1 {
+            font-size: 20px;
+            margin-bottom: 5px;
+            color: var(--primary);
+        }
+        
+        .language-switcher {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        .lang-btn {
+            padding: 6px 12px;
+            border: 1px solid var(--primary);
+            background: white;
+            color: var(--primary);
+            border-radius: 6px;
+            margin: 0 5px;
+            cursor: pointer;
+        }
+        
+        .lang-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: var(--text);
+            font-size: 14px;
+        }
+        
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        .btn {
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #0d7ae6;
+        }
+        
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+        
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+        
+        .data-table th,
+        .data-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .data-table th {
+            background: #fafafa;
+            font-weight: 600;
+        }
+        
+        .tabs {
+            display: flex;
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .tab {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+        
+        .tab.active {
+            border-bottom-color: var(--primary);
+            color: var(--primary);
+            font-weight: 600;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .message {
+            padding: 12px;
+            border-radius: 8px;
+            margin: 10px 0;
+            text-align: center;
+            display: none;
+        }
+        
+        .message.success {
+            background: #f6ffed;
+            border: 1px solid #b7eb8f;
+            color: var(--success);
+        }
+        
+        .qrcode-section {
+            text-align: center;
+            padding: 20px 0;
+        }
+        
+        .current-url {
+            background: #f0f8ff;
+            padding: 10px;
+            border-radius: 6px;
+            margin: 15px 0;
+            word-break: break-all;
+            font-size: 12px;
+            border: 1px dashed var(--primary);
+        }
+        
+        @media (min-width: 768px) {
+            .container {
+                max-width: 500px;
+                margin: 0 auto;
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="header">
+                <h1 id="title">生产数据收集系统</h1>
+                <p id="subtitle">扫码填写 · 无需登录</p>
+            </div>
+            
+            <div class="language-switcher">
+                <button class="lang-btn active" onclick="switchLanguage('zh')">中文</button>
+                <button class="lang-btn" onclick="switchLanguage('vi')">Tiếng Việt</button>
+                <button class="lang-btn" onclick="switchLanguage('en')">English</button>
+            </div>
+            
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('form')" id="tab-form">填写数据</div>
+                <div class="tab" onclick="switchTab('data')" id="tab-data">查看数据</div>
+                <div class="tab" onclick="switchTab('qrcode')" id="tab-qrcode">二维码</div>
+            </div>
+            
+            <!-- 填写表单 -->
+            <div class="tab-content active" id="form-tab">
+                <form id="productionForm">
+                    <div class="form-group">
+                        <label for="line_number" id="label-line">线号 *</label>
+                        <select id="line_number" name="line_number" required>
+                            <option value="">-- 请选择 --</option>
+                            <option value="Line-01">Line-01</option>
+                            <option value="Line-02">Line-02</option>
+                            <option value="Line-03">Line-03</option>
+                            <option value="Line-04">Line-04</option>
+                            <option value="Line-05">Line-05</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="customer" id="label-customer">客户 *</label>
+                        <select id="customer" name="customer" required>
+                            <option value="">-- 请选择 --</option>
+                            <option value="客户A">客户A</option>
+                            <option value="客户B">客户B</option>
+                            <option value="客户C">客户C</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="start_time" id="label-start">开始时间 *</label>
+                        <input type="datetime-local" id="start_time" name="start_time" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="end_time" id="label-end">结束时间 *</label>
+                        <input type="datetime-local" id="end_time" name="end_time" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="product_spec" id="label-spec">产品规格</label>
+                        <input type="text" id="product_spec" name="product_spec" placeholder="请输入产品规格">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="input_weight" id="label-input">来料重量 (KG)</label>
+                        <input type="number" step="0.01" id="input_weight" name="input_weight" placeholder="0.00">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="output_weight" id="label-output">良品重量 (KG)</label>
+                        <input type="number" step="0.01" id="output_weight" name="output_weight" placeholder="0.00">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="defect_count" id="label-defect">不良数量</label>
+                        <input type="number" id="defect_count" name="defect_count" placeholder="0">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="notes" id="label-notes">备注</label>
+                        <textarea id="notes" name="notes" rows="2" placeholder="请输入备注信息"></textarea>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary" id="btn-submit">提交数据</button>
+                </form>
+                
+                <div class="message" id="form-message"></div>
+            </div>
+            
+            <!-- 查看数据 -->
+            <div class="tab-content" id="data-tab">
+                <div style="margin-bottom: 15px;">
+                    <button class="btn btn-success" onclick="exportToExcel()" id="btn-export">导出Excel</button>
+                </div>
+                
+                <div style="max-height: 400px; overflow-y: auto;">
+                    <table class="data-table" id="data-table">
+                        <thead>
+                            <tr>
+                                <th>线号</th>
+                                <th>客户</th>
+                                <th>开始时间</th>
+                                <th>良品重量</th>
+                                <th>不良数</th>
+                            </tr>
+                        </thead>
+                        <tbody id="data-body">
+                            <!-- 数据行动态生成 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- 二维码 -->
+            <div class="tab-content" id="qrcode-tab">
+                <div class="qrcode-section">
+                    <h3 id="qrcode-title">扫码填写链接</h3>
+                    <div class="current-url" id="current-url">
+                        <!-- 当前URL显示在这里 -->
+                    </div>
+                    <p id="qrcode-desc">请复制上方链接，到草料二维码(cli.im)生成二维码</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 多语言配置
+        const translations = {
+            zh: {
+                title: "生产数据收集系统",
+                subtitle: "扫码填写 · 无需登录",
+                'label-line': "线号 *",
+                'label-customer': "客户 *", 
+                'label-start': "开始时间 *",
+                'label-end': "结束时间 *",
+                'label-spec': "产品规格",
+                'label-input': "来料重量 (KG)",
+                'label-output': "良品重量 (KG)", 
+                'label-defect': "不良数量",
+                'label-notes': "备注",
+                'btn-submit': "提交数据",
+                'btn-export': "导出Excel",
+                'tab-form': "填写数据",
+                'tab-data': "查看数据", 
+                'tab-qrcode': "二维码",
+                'qrcode-title': "扫码填写链接",
+                'qrcode-desc': "请复制上方链接，到草料二维码(cli.im)生成二维码",
+                'submit-success': "数据提交成功！",
+                'export-success': "Excel文件已生成，正在下载..."
+            },
+            vi: {
+                title: "Hệ thống thu thập dữ liệu sản xuất",
+                subtitle: "Quét mã để điền · Không cần đăng nhập",
+                'label-line': "Số dây chuyền *",
+                'label-customer': "Khách hàng *",
+                'label-start': "Thời gian bắt đầu *", 
+                'label-end': "Thời gian kết thúc *",
+                'label-spec': "Quy cách sản phẩm",
+                'label-input': "Khối lượng nguyên liệu (KG)",
+                'label-output': "Khối lượng thành phẩm (KG)",
+                'label-defect': "Số lượng phế phẩm", 
+                'label-notes': "Ghi chú",
+                'btn-submit': "Gửi dữ liệu",
+                'btn-export': "Xuất Excel",
+                'tab-form': "Điền dữ liệu",
+                'tab-data': "Xem dữ liệu",
+                'tab-qrcode': "Mã QR", 
+                'qrcode-title': "Liên kết quét mã điền form",
+                'qrcode-desc': "Sao chép liên kết trên và tạo mã QR tại cli.im",
+                'submit-success': "Gửi dữ liệu thành công!",
+                'export-success': "Đang tải xuống file Excel..."
+            },
+            en: {
+                title: "Production Data Collection System", 
+                subtitle: "Scan to Fill · No Login Required",
+                'label-line': "Line Number *",
+                'label-customer': "Customer *",
+                'label-start': "Start Time *",
+                'label-end': "End Time *",
+                'label-spec': "Product Specification", 
+                'label-input': "Input Weight (KG)",
+                'label-output': "Good Product Weight (KG)",
+                'label-defect': "Defect Quantity",
+                'label-notes': "Notes",
+                'btn-submit': "Submit Data",
+                'btn-export': "Export Excel", 
+                'tab-form': "Fill Form",
+                'tab-data': "View Data",
+                'tab-qrcode': "QR Code",
+                'qrcode-title': "Scan to Fill Link",
+                'qrcode-desc': "Copy the link above and generate QR code at cli.im",
+                'submit-success': "Data submitted successfully!",
+                'export-success': "Excel file generated, downloading..."
+            }
+        };
+
+        let currentLanguage = 'zh';
+
+        // 切换语言
+        function switchLanguage(lang) {
+            currentLanguage = lang;
+            
+            // 更新语言按钮状态
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // 更新界面文本
+            Object.keys(translations[lang]).forEach(key => {
+                const element = document.getElementById(key);
+                if (element) {
+                    element.textContent = translations[lang][key];
+                }
+            });
+        }
+
+        // 切换标签页
+        function switchTab(tabName) {
+            // 更新标签状态
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            event.target.classList.add('active');
+            document.getElementById(tabName + '-tab').classList.add('active');
+            
+            // 如果是二维码标签，更新URL显示
+            if (tabName === 'qrcode') {
+                document.getElementById('current-url').textContent = window.location.href;
+            }
+        }
+
+        // 显示消息
+        function showMessage(message, type = 'success') {
+            const messageEl = document.getElementById('form-message');
+            messageEl.textContent = message;
+            messageEl.className = `message ${type}`;
+            messageEl.style.display = 'block';
+            
+            setTimeout(() => {
+                messageEl.style.display = 'none';
+            }, 3000);
+        }
+
+        // 加载数据
+        function loadData() {
+            const savedData = localStorage.getItem('productionData');
+            const tbody = document.getElementById('data-body');
+            
+            if (savedData) {
+                const data = JSON.parse(savedData);
+                tbody.innerHTML = data.map((item, index) => `
+                    <tr>
+                        <td>${item.line_number}</td>
+                        <td>${item.customer}</td>
+                        <td>${formatDateTime(item.start_time)}</td>
+                        <td>${item.output_weight || '0'}</td>
+                        <td>${item.defect_count || '0'}</td>
+                    </tr>
+                `).join('');
+            } else {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #999;">暂无数据</td></tr>';
+            }
+        }
+
+        // 格式化日期时间
+        function formatDateTime(datetimeStr) {
+            if (!datetimeStr) return '';
+            const date = new Date(datetimeStr);
+            return date.toLocaleString(currentLanguage === 'vi' ? 'vi-VN' : 
+                                      currentLanguage === 'en' ? 'en-US' : 'zh-CN');
+        }
+
+        // 导出Excel
+        function exportToExcel() {
+            const savedData = localStorage.getItem('productionData');
+            if (!savedData) {
+                alert('没有数据可导出');
+                return;
+            }
+            
+            const data = JSON.parse(savedData);
+            let csv = '\uFEFF'; // BOM for UTF-8
+            
+            // 表头
+            const headers = currentLanguage === 'vi' ? 
+                ['Số dây chuyền', 'Khách hàng', 'Thời gian bắt đầu', 'Thời gian kết thúc', 'Quy cách', 'Nguyên liệu (KG)', 'Thành phẩm (KG)', 'Phế phẩm', 'Ghi chú'] :
+                currentLanguage === 'en' ?
+                ['Line', 'Customer', 'Start Time', 'End Time', 'Specification', 'Input (KG)', 'Output (KG)', 'Defects', 'Notes'] :
+                ['线号', '客户', '开始时间', '结束时间', '产品规格', '来料重量(KG)', '良品重量(KG)', '不良数量', '备注'];
+            
+            csv += headers.join(',') + '\n';
+            
+            // 数据行
+            data.forEach(item => {
+                const row = [
+                    item.line_number,
+                    item.customer,
+                    `"${formatDateTime(item.start_time)}"`,
+                    `"${formatDateTime(item.end_time)}"`,
+                    `"${item.product_spec || ''}"`,
+                    item.input_weight || '0',
+                    item.output_weight || '0',
+                    item.defect_count || '0',
+                    `"${item.notes || ''}"`
+                ];
+                csv += row.join(',') + '\n';
+            });
+            
+            // 创建下载链接
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `production_data_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showMessage(translations[currentLanguage]['export-success']);
+        }
+
+        // 表单提交
+        document.getElementById('productionForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+            data.id = Date.now();
+            data.submit_time = new Date().toISOString();
+            
+            // 获取现有数据
+            const existingData = JSON.parse(localStorage.getItem('productionData') || '[]');
+            
+            // 添加新数据
+            existingData.push(data);
+            
+            // 保存到本地存储
+            localStorage.setItem('productionData', JSON.stringify(existingData));
+            
+            // 重新加载数据表格
+            loadData();
+            
+            // 显示成功消息
+            showMessage(translations[currentLanguage]['submit-success']);
+            
+            // 重置表单
+            this.reset();
+            
+            // 设置默认时间为当前时间
+            const now = new Date();
+            const timeString = now.toISOString().slice(0, 16);
+            document.getElementById('start_time').value = timeString;
+            document.getElementById('end_time').value = timeString;
+        });
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 设置默认时间
+            const now = new Date();
+            const timeString = now.toISOString().slice(0, 16);
+            document.getElementById('start_time').value = timeString;
+            document.getElementById('end_time').value = timeString;
+            
+            // 加载数据
+            loadData();
+            
+            // 显示当前URL
+            document.getElementById('current-url').textContent = window.location.href;
+        });
+    </script>
+</body>
+</html>
